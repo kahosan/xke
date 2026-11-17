@@ -3,6 +3,7 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -33,7 +34,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: go build -trimpath -ldflags="-s -w" -o xke .
+      - run: go build -trimpath -ldflags="-s -w" -o xke-${{ matrix.goos }}-${{ matrix.goarch }} .
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -41,4 +42,19 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: xke-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: xke
+          path: xke-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
